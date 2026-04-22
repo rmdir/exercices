@@ -47,5 +47,5 @@ jobs:
           # Crucial: set the context to the specific folder
           context: ./8_bit_adder
           push: true
-          tags: ${{ id.meta.outputs.tags }}
-          labels: ${{ id.meta.outputs.labels }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
