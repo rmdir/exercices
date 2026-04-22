@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>8-Bit Visual Logic Adder</title>
+    <style>
+        :root {
+            --bg: #1a1a1a;
+            --panel: #2d2d2d;
+            --text: #e0e0e0;
+            --accent: #3498db;
+            --on: #2ecc71;
+            --carry: #f1c40f;
+        }
+
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            background: var(--bg); 
+            color: var(--text); 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            padding: 20px;
+        }
+
+        .panel { 
+            background: var(--panel); 
+            padding: 30px; 
+            border-radius: 12px; 
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            border: 1px solid #444;
+            max-width: 800px;
+        }
+
+        .row { display: flex; align-items: center; margin: 15px 0; gap: 15px; }
+        .label { width: 120px; font-weight: bold; color: var(--accent); text-transform: uppercase; font-size: 0.9em; }
+        
+        /* Switch UI */
+        .switch { position: relative; display: inline-block; width: 34px; height: 60px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { 
+            position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; 
+            background-color: #444; transition: .3s; border-radius: 6px; border: 2px solid #222;
+        }
+        .slider:before { 
+            position: absolute; content: ""; height: 24px; width: 26px; left: 2px; bottom: 4px; 
+            background-color: #888; transition: .3s; border-radius: 4px; box-shadow: inset 0 2px 2px rgba(255,255,255,0.2);
+        }
+        input:checked + .slider { background-color: var(--accent); }
+        input:checked + .slider:before { transform: translateY(-28px); background-color: #fff; }
+
+        /* LED UI */
+        .led-container { display: flex; flex-direction: column; align-items: center; gap: 5px; }
+        .led-label { font-size: 10px; color: #888; }
+        .led { width: 28px; height: 28px; border-radius: 50%; background: #222; border: 2px solid #111; transition: 0.2s; position: relative; }
+        .led.on { background: var(--on); box-shadow: 0 0 15px var(--on), inset 0 0 5px white; }
+        .led.carry { background: var(--carry); box-shadow: 0 0 15px var(--carry), inset 0 0 5px white; }
+
+        /* Controls */
+        .mode-btn { 
+            background: #444; border: none; color: white; padding: 10px 20px; 
+            border-radius: 5px; cursor: pointer; font-weight: bold; transition: 0.2s;
+        }
+        .mode-btn:hover { background: var(--accent); }
+
+        table { margin-top: 30px; border-collapse: collapse; width: 100%; background: #222; border-radius: 8px; overflow: hidden; }
+        th, td { padding: 12px; border-bottom: 1px solid #333; text-align: center; }
+        th { background: #333; color: var(--accent); font-size: 0.8em; }
+        .mono { font-family: 'Courier New', Courier, monospace; letter-spacing: 2px; color: var(--on); }
+    </style>
+</head>
+<body>
+
+    <div class="panel">
+        <div class="row" style="justify-content: space-between;">
+            <h2 style="margin:0">8-BIT ADDER</h2>
+            <button id="modeToggle" class="mode-btn" onclick="toggleMode()">MODE: UNSIGNED</button>
+        </div>
+
+        <hr style="border: 0; border-top: 1px solid #444; margin: 20px 0;">
+
+        <div class="row" id="inputA">
+            <span class="label">Input A (8-bit)</span>
+            </div>
+
+        <div class="row" id="inputB">
+            <span class="label">Input B (8-bit)</span>
+            </div>
+
+        <hr style="border: 0; border-top: 1px solid #444; margin: 20px 0;">
+
+        <div class="row">
+            <span class="label">Output (Result)</span>
+            <div class="led-container">
+                <span class="led-label">CARRY</span>
+                <div id="carryLed" class="led"></div>
+            </div>
+            <div style="width: 10px;"></div> <div id="resLeds" style="display: flex; gap: 10px;">
+                </div>
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>VAR</th>
+                    <th>BINARY</th>
+                    <th>HEX</th>
+                    <th>DECIMAL</th>
+                </tr>
+            </thead>
+            <tbody id="statTable">
+                </tbody>
+        </table>
+    </div>
+
+    <script>
+        let isSigned = false;
+
+        // Create 8 switches for inputs
+        function initInputs(containerId, prefix) {
+            const container = document.getElementById(containerId);
+            for (let i = 7; i >= 0; i--) {
+                container.innerHTML += `
+                    <div class="led-container">
+                        <span class="led-label">2<sup>${i}</sup></span>
+                        <label class="switch">
+                            <input type="checkbox" id="${prefix}_${i}" onclick="calculate()">
+                            <span class="slider"></span>
+                        </label>
+                    </div>`;
+            }
+        }
+
+        // Create 8 LEDs for result
+        function initLeds() {
+            const container = document.getElementById('resLeds');
+            for (let i = 7; i >= 0; i--) {
+                container.innerHTML += `
+                    <div class="led-container">
+                        <span class="led-label">2<sup>${i}</sup></span>
+                        <div id="led_${i}" class="led"></div>
+                    </div>`;
+            }
+        }
+
+        function toggleMode() {
+            isSigned = !isSigned;
+            document.getElementById('modeToggle').innerText = isSigned ? "MODE: SIGNED (2's COMP)" : "MODE: UNSIGNED";
+            calculate();
+        }
+
+        function getBinaryValue(prefix) {
+            let val = 0;
+            for (let i = 0; i < 8; i++) {
+                if (document.getElementById(`${prefix}_${i}`).checked) {
+                    val |= (1 << i);
+                }
+            }
+            return val;
+        }
+
+        // Handles signed vs unsigned decimal conversion
+        function toDecimalDisplay(val) {
+            if (!isSigned) return val;
+            // 8-bit signed: if bit 7 is set, it's negative
+            return val > 127 ? val - 256 : val;
+        }
+
+        function calculate() {
+            const a = getBinaryValue('a');
+            const b = getBinaryValue('b');
+            const sum = a + b;
+            
+            // Result is truncated to 8 bits
+            const result8bit = sum & 0xFF;
+            const carry = sum > 255 ? 1 : 0;
+
+            // Update LEDs
+            for (let i = 0; i < 8; i++) {
+                const bit = (result8bit >> i) & 1;
+                document.getElementById(`led_${i}`).className = bit ? "led on" : "led";
+            }
+            
+            // Special Carry/Overflow LED
+            document.getElementById('carryLed').className = carry ? "led carry" : "led";
+
+            // Update Data Table
+            const data = [
+                { name: "A", val: a },
+                { name: "B", val: b },
+                { name: "RESULT", val: result8bit }
+            ];
+
+            let tableHtml = "";
+            data.forEach(item => {
+                tableHtml += `
+                    <tr>
+                        <td><b>${item.name}</b></td>
+                        <td class="mono">${item.val.toString(2).padStart(8, '0')}</td>
+                        <td class="mono">0x${item.val.toString(16).toUpperCase().padStart(2, '0')}</td>
+                        <td style="color:white; font-weight:bold;">${toDecimalDisplay(item.val)}</td>
+                    </tr>`;
+            });
+            document.getElementById('statTable').innerHTML = tableHtml;
+        }
+
+        // Run on load
+        initInputs('inputA', 'a');
+        initInputs('inputB', 'b');
+        initLeds();
+        calculate();
+    </script>
+</body>
+</html>
